@@ -55,13 +55,19 @@ class Webgrind_Preprocessor
 		$functions = array();
 		$headers = array();
 		$calls = array();
+        $nameCompressionMap = array();  // To support name compression, a position specification can be not only of the format "spec=name", but also "spec=(ID) name" to specify a mapping of an integer ID to a name, and "spec=(ID)" to reference a previously defined ID mapping.
 		
 		
 		// Read information into memory
 		while(($line = fgets($in))){
 			if(substr($line,0,3)==='fl='){
 				// Found invocation of function. Read functionname
-				list($function) = fscanf($in,"fn=%s");
+				list($ID, $function) = fscanf($in,"fn=%s %s");
+                if ($function) { // spec=(ID) name
+                    $nameCompressionMap[$ID] = $function;
+                }
+                $function = $ID;
+
 				if(!isset($functions[$function])){
 					$functions[$function] = array('filename'=>substr(trim($line),3), 'invocationCount'=>0,'nr'=>$nextFuncNr++,'count'=>0,'summedSelfCost'=>0,'summedInclusiveCost'=>0,'calledFromInformation'=>array(),'subCallInformation'=>array());
 				} 
@@ -113,6 +119,9 @@ class Webgrind_Preprocessor
 		fseek($out,self::NR_SIZE*$functionCount, SEEK_CUR);
 		$functionAddresses = array();
 		foreach($functions as $functionName => $function){
+            if (isset($nameCompressionMap[$functionName])) {
+                $functionName = $nameCompressionMap[$functionName];
+            }
 			$functionAddresses[] = ftell($out);
 			$calledFromCount = sizeof($function['calledFromInformation']);
 			$subCallCount = sizeof($function['subCallInformation']);
